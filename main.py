@@ -9,11 +9,12 @@ app = FastAPI()
 
 # --- START OF CORS CONFIGURATION ---
 origins = [
-    "https://signal-harvest-network.lovable.app/youtube", # Your Lovable frontend origin
-    # You can add other origins here if needed, e.g., for local development:
-    # "http://localhost",
-    # "http://localhost:3000",
+    "https://signal-harvest-network.lovable.app/youtube",
+    "https://be564ce8-3dfa-4702-9776-a32b828cbc70.lovableproject.com",
+    "https://*.lovableproject.com",  # Optional wildcard
+    "http://localhost:3000",         # Optional for dev
 ]
+
 
 app.add_middleware(
     CORSMiddleware,
