@@ -1,14 +1,32 @@
 # main.py (YouTube Only)
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware # <--- Good, you have this
 from pydantic import BaseModel
 from youtube_scraper import YoutubeScraper # Import the YoutubeScraper
 from googleapiclient.errors import HttpError # For handling YouTube API errors
 
 app = FastAPI()
 
+# --- START OF CORS CONFIGURATION ---
+origins = [
+    "https://signal-harvest-network.lovable.app/youtube", # Your Lovable frontend origin
+    # You can add other origins here if needed, e.g., for local development:
+    # "http://localhost",
+    # "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all standard methods
+    allow_headers=["*"], # Allows all standard headers
+)
+# --- END OF CORS CONFIGURATION ---
+
 # --- Models ---
 class ScrapeConfigRequest(BaseModel):
-    """
+    """ # <- Ensure no leading spaces before this line or its content if copied
     Configuration for YouTube scraping.
     """
     platform_config: dict # The actual configuration for the YoutubeScraper
@@ -16,7 +34,7 @@ class ScrapeConfigRequest(BaseModel):
 # --- YouTube Scraping ---
 @app.post("/scrape_youtube")
 async def scrape_youtube_endpoint(request: ScrapeConfigRequest):
-    """
+    """ # <- Ensure no leading spaces before this line or its content if copied
     Endpoint to scrape data from YouTube.
     The 'platform_config' should contain the YouTube API key and sources.
     Example platform_config for YouTube:
