@@ -1,78 +1,39 @@
-# main.py (YouTube Only)
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware # <--- Good, you have this
+# main.py
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from youtube_scraper import YoutubeScraper # Import the YoutubeScraper
-from googleapiclient.errors import HttpError # For handling YouTube API errors
+from youtube_scraper import YoutubeScraper
 
 app = FastAPI()
 
-# --- START OF CORS CONFIGURATION ---
-origins = [
-    "https://signal-harvest-network.lovable.app/youtube",
-    "https://be564ce8-3dfa-4702-9776-a32b828cbc70.lovableproject.com",
-    "https://*.lovableproject.com",  # Optional wildcard
-    "http://localhost:3000",         # Optional for dev
-]
-
-
+# ✅ Enable CORS so Loveable frontend can connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # You can restrict to specific domains later
     allow_credentials=True,
-    allow_methods=["*"], # Allows all standard methods
-    allow_headers=["*"], # Allows all standard headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-# --- END OF CORS CONFIGURATION ---
 
-# --- Models ---
-class ScrapeConfigRequest(BaseModel):
-    """ # <- Ensure no leading spaces before this line or its content if copied
-    Configuration for YouTube scraping.
-    """
-    platform_config: dict # The actual configuration for the YoutubeScraper
+# 📩 Request body structure (frontend will send this)
+class SearchRequest(BaseModel):
+    query: str
+    max_results: int = 10
+    api_key: str  # 🔐 passed from Loveable
 
-# --- YouTube Scraping ---
-@app.post("/scrape_youtube")
-async def scrape_youtube_endpoint(request: ScrapeConfigRequest):
-    """ # <- Ensure no leading spaces before this line or its content if copied
-    Endpoint to scrape data from YouTube.
-    The 'platform_config' should contain the YouTube API key and sources.
-    Example platform_config for YouTube:
-    {
-        "youtube_api_key": "YOUR_YOUTUBE_DATA_API_KEY",
-        "sources": [
-            {
-                "type": "search_videos",
-                "query": "fastapi tutorial",
-                "max_results": 3
-            },
-            {
-                "type": "video_comments",
-                "video_id": "SOME_VIDEO_ID",
-                "max_results": 5
-            }
-        ]
-    }
-    """
-    try:
-        scraper = YoutubeScraper(request.platform_config)
-        data = scraper.fetch_data()
-        return {"status": "success", "platform": "YouTube", "data": data}
-    except ValueError as ve: # Catch specific errors like missing API key
-        raise HTTPException(status_code=400, detail=str(ve))
-    except HttpError as he: # Catch Google API specific HTTP errors
-        error_content = he.content.decode() if he.content else "No further details."
-        raise HTTPException(status_code=he.resp.status, detail=f"YouTube API error: {error_content}")
-    except Exception as e:
-        # Consider logging the full traceback here for debugging
-        # import traceback
-        # print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error during YouTube scraping: {str(e)}")
+class CommentRequest(BaseModel):
+    video_id: str
+    max_results: int = 100
+    api_key: str  # 🔐 passed from Loveable
 
-@app.get("/")
-async def root():
-    return {"message": "YouTube Scraper API is running. Use /scrape_youtube."}
+# 🔍 Search YouTube videos
+@app.post("/api/youtube/search-videos")
+async def search_videos(req: SearchRequest):
+    scraper = YoutubeScraper(req.api_key)
+    return scraper.search_videos(req.query, req.max_results)
 
-# To run this app (if you save it as main.py):
-# uvicorn main:app --reload
+# 💬 Fetch comments from a video
+@app.post("/api/youtube/fetch-comments")
+async def fetch_comments(req: CommentRequest):
+    scraper = YoutubeScraper(req.api_key)
+    return scraper.fetch_comments(req.video_id, req.max_results)
