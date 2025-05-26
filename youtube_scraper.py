@@ -12,14 +12,14 @@ class YoutubeScraper:
             "q": query,
             "type": "video",
             "part": "id",
-            "maxResults": max_results,
+            "maxResults": 50  # Always pull 50, sort after
         }
         if published_after:
             search_request["publishedAfter"] = published_after
 
         search_response = self.youtube.search().list(**search_request).execute()
-
         video_ids = [item["id"]["videoId"] for item in search_response.get("items", [])]
+
         if not video_ids:
             return {"videos": [], "total_results": 0}
 
@@ -37,25 +37,29 @@ class YoutubeScraper:
             except:
                 return "00:00"
 
-        videos = []
+        all_videos = []
         for item in videos_response.get("items", []):
             stats = item.get("statistics", {})
             snippet = item.get("snippet", {})
             content = item.get("contentDetails", {})
             video_id = item["id"]
+            comment_count = int(stats.get("commentCount", 0))
 
-            videos.append({
+            if comment_count == 0:
+                continue  # Skip videos with no comments
+
+            all_videos.append({
                 "video_id": video_id,
                 "video_title": snippet.get("title", ""),
                 "channel_name": snippet.get("channelTitle", ""),
                 "description": snippet.get("description", ""),
                 "url": f"https://www.youtube.com/watch?v={video_id}",
                 "view_count": int(stats.get("viewCount", 0)),
-                "comment_count": int(stats.get("commentCount", 0)),
+                "comment_count": comment_count,
                 "like_count": int(stats.get("likeCount", 0)),
-                "dislike_count": 0,  # No longer available via API
-                "subscriber_count": None,  # Requires separate API call
-                "channel_verified": False,  # Not accessible from public API
+                "dislike_count": 0,
+                "subscriber_count": None,
+                "channel_verified": False,
                 "duration": format_duration(content.get("duration", "")),
                 "published_at": snippet.get("publishedAt", ""),
                 "thumbnail_url": snippet.get("thumbnails", {}).get("default", {}).get("url", ""),
@@ -63,9 +67,10 @@ class YoutubeScraper:
                 "tags": snippet.get("tags", []),
             })
 
+        sorted_videos = sorted(all_videos, key=lambda v: v["comment_count"], reverse=True)
         return {
-            "videos": videos,
-            "total_results": len(videos)
+            "videos": sorted_videos[:max_results],
+            "total_results": len(sorted_videos)
         }
 
     def fetch_comments(self, video_id, max_results=100):
@@ -98,11 +103,11 @@ class YoutubeScraper:
             if not next_page_token:
                 break
 
-        # Fetch video title for metadata
         video_data = self.youtube.videos().list(
             part="snippet",
             id=video_id
         ).execute()
+
         video_title = video_data["items"][0]["snippet"]["title"] if video_data["items"] else "Unknown Title"
 
         return {
