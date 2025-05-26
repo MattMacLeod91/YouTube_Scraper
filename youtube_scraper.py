@@ -7,13 +7,17 @@ class YoutubeScraper:
         self.api_key = api_key
         self.youtube = build("youtube", "v3", developerKey=api_key)
 
-    def search_videos(self, query, max_results=10):
-        search_response = self.youtube.search().list(
-            q=query,
-            type="video",
-            part="id",
-            maxResults=max_results
-        ).execute()
+    def search_videos(self, query, max_results=10, published_after=None):
+        search_request = {
+            "q": query,
+            "type": "video",
+            "part": "id",
+            "maxResults": max_results,
+        }
+        if published_after:
+            search_request["publishedAfter"] = published_after
+
+        search_response = self.youtube.search().list(**search_request).execute()
 
         video_ids = [item["id"]["videoId"] for item in search_response.get("items", [])]
         if not video_ids:
@@ -38,15 +42,25 @@ class YoutubeScraper:
             stats = item.get("statistics", {})
             snippet = item.get("snippet", {})
             content = item.get("contentDetails", {})
+            video_id = item["id"]
+
             videos.append({
-                "video_id": item["id"],
-                "title": snippet.get("title", ""),
+                "video_id": video_id,
+                "video_title": snippet.get("title", ""),
                 "channel_name": snippet.get("channelTitle", ""),
+                "description": snippet.get("description", ""),
+                "url": f"https://www.youtube.com/watch?v={video_id}",
                 "view_count": int(stats.get("viewCount", 0)),
                 "comment_count": int(stats.get("commentCount", 0)),
+                "like_count": int(stats.get("likeCount", 0)),
+                "dislike_count": 0,  # No longer available via API
+                "subscriber_count": None,  # Requires separate API call
+                "channel_verified": False,  # Not accessible from public API
                 "duration": format_duration(content.get("duration", "")),
                 "published_at": snippet.get("publishedAt", ""),
-                "thumbnail_url": snippet.get("thumbnails", {}).get("default", {}).get("url", "")
+                "thumbnail_url": snippet.get("thumbnails", {}).get("default", {}).get("url", ""),
+                "category_id": snippet.get("categoryId", None),
+                "tags": snippet.get("tags", []),
             })
 
         return {
